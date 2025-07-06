@@ -9,10 +9,10 @@ app.get("/api/assets/:userId", async (req, res) => {
   const { userId } = req.params;
 
   try {
-    // 🎽 1. Obtenir les vêtements
+    // Obtenir les vêtements
     const clothingRes = await axios.get("https://catalog.roblox.com/v1/search/items", {
       params: {
-        category: 3, // vêtements
+        category: 3,
         creatorTargetId: userId,
         limit: 30,
         sortOrder: "Asc"
@@ -26,36 +26,36 @@ app.get("/api/assets/:userId", async (req, res) => {
       thumbnail: item.thumbnail?.imageUrl || ""
     }));
 
-    // 🎮 2. Obtenir les jeux de l'utilisateur
-    const gamesRes = await axios.get(`https://games.roblox.com/v2/users/${userId}/games`);
-    const games = gamesRes.data.data;
+    let passes = [];
 
-    const passes = [];
+    try {
+      // Essayer d'obtenir les jeux
+      const gamesRes = await axios.get(`https://games.roblox.com/v2/users/${userId}/games`);
+      const games = gamesRes.data.data;
 
-    // 🎟️ 3. Pour chaque jeu, récupérer les Game Passes
-    for (const game of games) {
-      const gameId = game.id;
+      // Pour chaque jeu, récupérer les Game Passes
+      for (const game of games) {
+        try {
+          const passRes = await axios.get(`https://games.roblox.com/v1/games/${game.id}/game-passes`);
+          const gamePasses = passRes.data;
 
-      try {
-        const passRes = await axios.get(`https://games.roblox.com/v1/games/${gameId}/game-passes`);
-        const gamePasses = passRes.data;
-
-        gamePasses.forEach(pass => {
-          passes.push({
-            id: pass.id,
-            name: pass.name,
-            price: pass.price || 0,
-            thumbnail: `https://thumbnails.roblox.com/v1/assets?assetIds=${pass.id}&format=Png&size=150x150`
+          gamePasses.forEach(pass => {
+            passes.push({
+              id: pass.id,
+              name: pass.name,
+              price: pass.price || 0,
+              thumbnail: `https://thumbnails.roblox.com/v1/assets?assetIds=${pass.id}&format=Png&size=150x150`
+            });
           });
-        });
-      } catch (err) {
-        // ignorer les erreurs pour certains jeux
+        } catch (e) {
+          // Ignorer les erreurs pour chaque jeu
+        }
       }
+    } catch (e) {
+      // Aucun jeu — on continue sans passes
     }
 
-    // ✅ Fusionner tout
     const assets = [...clothes, ...passes];
-
     res.json({ assets });
   } catch (err) {
     console.error(err);
