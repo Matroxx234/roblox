@@ -10,21 +10,27 @@ app.use(cors());
 app.get('/api/passes/:userId', async (req, res) => {
   const userId = req.params.userId;
 
-  // Vérifie si c’est en cache (10 minutes)
+  if (!userId || isNaN(userId)) {
+    return res.status(400).json({ error: "Invalid userId" });
+  }
+
+  // Vérifie le cache (valide 10 minutes)
   if (cache[userId] && Date.now() - cache[userId].timestamp < 10 * 60 * 1000) {
     return res.json({ assets: cache[userId].data });
   }
 
   try {
+    // Étape 1 : récupérer les jeux du joueur
     const response = await axios.get(`https://games.roblox.com/v1/users/${userId}/games`);
     const games = response.data.data;
 
-    if (!games || games.length === 0) {
-      return res.status(404).json({ error: "No games found" });
+    if (!games || games.length === 0 || !games[0].rootPlace) {
+      return res.status(404).json({ error: "No public games with Game Passes found" });
     }
 
     const placeId = games[0].rootPlace.id;
 
+    // Étape 2 : récupérer les Game Pass pour ce jeu
     const passRes = await axios.get(`https://www.roblox.com/game-pass-api/game-passes?startRowIndex=0&maxRows=100&placeId=${placeId}`);
     const raw = passRes.data;
 
@@ -35,7 +41,7 @@ app.get('/api/passes/:userId', async (req, res) => {
       thumbnail: `https://www.roblox.com/Thumbs/Asset.ashx?assetId=${pass.AssetId}&x=150&y=150&format=png`
     }));
 
-    // Ajout au cache
+    // Stocker en cache
     cache[userId] = {
       data: passes,
       timestamp: Date.now()
@@ -44,7 +50,11 @@ app.get('/api/passes/:userId', async (req, res) => {
     res.json({ assets: passes });
 
   } catch (err) {
-    res.status(400).json({ error: "Erreur de récupération", message: err.message });
+    console.error("Erreur de récupération :", err.message);
+    res.status(400).json({
+      error: "Erreur de récupération",
+      message: err.message
+    });
   }
 });
 
