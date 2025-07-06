@@ -9,7 +9,7 @@ app.get("/api/assets/:userId", async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const gamepassesRes = await axios.get(`https://games.roblox.com/v1/users/${userId}/game-passes`);
+   const gamepassesRes = await axios.get(`https://inventory.roblox.com/v1/users/${userId}/assets/999999999`);
     const catalogRes = await axios.get(`https://catalog.roblox.com/v1/search/items`, {
       params: {
         category: 3,
