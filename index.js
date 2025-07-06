@@ -9,54 +9,32 @@ app.get("/api/assets/:userId", async (req, res) => {
   const { userId } = req.params;
 
   try {
-    // Obtenir les vêtements
-    const clothingRes = await axios.get("https://catalog.roblox.com/v1/search/items", {
-      params: {
-        category: 3,
-        creatorTargetId: userId,
-        limit: 30,
-        sortOrder: "Asc"
-      }
-    });
+    const passes = [];
 
-    const clothes = clothingRes.data.data.map(item => ({
-      id: item.id,
-      name: item.name,
-      price: item.price || 0,
-      thumbnail: item.thumbnail?.imageUrl || ""
-    }));
+    // Obtenir les jeux de l'utilisateur
+    const gamesRes = await axios.get(`https://games.roblox.com/v2/users/${userId}/games`);
+    const games = gamesRes.data.data;
 
-    let passes = [];
+    // Pour chaque jeu, récupérer les Game Passes
+    for (const game of games) {
+      try {
+        const passRes = await axios.get(`https://games.roblox.com/v1/games/${game.id}/game-passes`);
+        const gamePasses = passRes.data;
 
-    try {
-      // Essayer d'obtenir les jeux
-      const gamesRes = await axios.get(`https://games.roblox.com/v2/users/${userId}/games`);
-      const games = gamesRes.data.data;
-
-      // Pour chaque jeu, récupérer les Game Passes
-      for (const game of games) {
-        try {
-          const passRes = await axios.get(`https://games.roblox.com/v1/games/${game.id}/game-passes`);
-          const gamePasses = passRes.data;
-
-          gamePasses.forEach(pass => {
-            passes.push({
-              id: pass.id,
-              name: pass.name,
-              price: pass.price || 0,
-              thumbnail: `https://thumbnails.roblox.com/v1/assets?assetIds=${pass.id}&format=Png&size=150x150`
-            });
+        gamePasses.forEach(pass => {
+          passes.push({
+            id: pass.id,
+            name: pass.name,
+            price: pass.price || 0,
+            thumbnail: `https://thumbnails.roblox.com/v1/assets?assetIds=${pass.id}&format=Png&size=150x150`
           });
-        } catch (e) {
-          // Ignorer les erreurs pour chaque jeu
-        }
+        });
+      } catch (e) {
+        // Ignore erreurs pour ce jeu
       }
-    } catch (e) {
-      // Aucun jeu — on continue sans passes
     }
 
-    const assets = [...clothes, ...passes];
-    res.json({ assets });
+    res.json({ assets: passes });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Erreur de récupération", message: err.message });
@@ -64,4 +42,5 @@ app.get("/api/assets/:userId", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("✅ Proxy prêt sur le port " + PORT));
+app.listen(PORT, () => console.log("✅ Proxy passes-only prêt sur le port " + PORT));
+
