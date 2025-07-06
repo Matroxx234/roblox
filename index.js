@@ -9,37 +9,56 @@ app.get("/api/assets/:userId", async (req, res) => {
   const { userId } = req.params;
 
   try {
-   const gamepassesRes = await axios.get(`https://inventory.roblox.com/v1/users/${userId}/assets/999999999`);
-    const catalogRes = await axios.get(`https://catalog.roblox.com/v1/search/items`, {
+    // 🎽 1. Obtenir les vêtements
+    const clothingRes = await axios.get("https://catalog.roblox.com/v1/search/items", {
       params: {
-        category: 3,
+        category: 3, // vêtements
         creatorTargetId: userId,
-        limit: 30
+        limit: 30,
+        sortOrder: "Asc"
       }
     });
 
-    const assets = [];
+    const clothes = clothingRes.data.data.map(item => ({
+      id: item.id,
+      name: item.name,
+      price: item.price || 0,
+      thumbnail: item.thumbnail?.imageUrl || ""
+    }));
 
-    for (const item of catalogRes.data.data) {
-      assets.push({
-        id: item.id,
-        name: item.name,
-        price: item.price || 0,
-        thumbnail: item.thumbnail.imageUrl
-      });
+    // 🎮 2. Obtenir les jeux de l'utilisateur
+    const gamesRes = await axios.get(`https://games.roblox.com/v2/users/${userId}/games`);
+    const games = gamesRes.data.data;
+
+    const passes = [];
+
+    // 🎟️ 3. Pour chaque jeu, récupérer les Game Passes
+    for (const game of games) {
+      const gameId = game.id;
+
+      try {
+        const passRes = await axios.get(`https://games.roblox.com/v1/games/${gameId}/game-passes`);
+        const gamePasses = passRes.data;
+
+        gamePasses.forEach(pass => {
+          passes.push({
+            id: pass.id,
+            name: pass.name,
+            price: pass.price || 0,
+            thumbnail: `https://thumbnails.roblox.com/v1/assets?assetIds=${pass.id}&format=Png&size=150x150`
+          });
+        });
+      } catch (err) {
+        // ignorer les erreurs pour certains jeux
+      }
     }
 
-    for (const pass of gamepassesRes.data.data) {
-      assets.push({
-        id: pass.id,
-        name: pass.name,
-        price: pass.price || 0,
-        thumbnail: `https://www.roblox.com/Thumbs/Asset.ashx?assetId=${pass.id}`
-      });
-    }
+    // ✅ Fusionner tout
+    const assets = [...clothes, ...passes];
 
     res.json({ assets });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Erreur de récupération", message: err.message });
   }
 });
